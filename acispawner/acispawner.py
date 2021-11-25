@@ -19,7 +19,7 @@ from azure.mgmt.containerinstance.models import (
 from azure.identity import DefaultAzureCredential
 
 from jupyterhub.spawner import Spawner
-from traitlets import Bool, Dict, List, Unicode, Int
+from traitlets import List, Unicode, Int, Float
 
 
 class ACISpawner(Spawner):
@@ -38,10 +38,55 @@ class ACISpawner(Spawner):
         allow_none=False,
         help="image registry server",
     ).tag(config=True)
+    container_image = Unicode(
+        None,
+        allow_none=False,
+        help="url of container image",
+    ).tag(config=True)
+    subscription_id = Unicode(
+        None,
+        allow_none=False,
+        help="azure subscription id",
+    ).tag(config=True)
+    resource_group = Unicode(
+        None,
+        allow_none=False,
+        help="azure resource group",
+    ).tag(config=True)
+    container_group_location = Unicode(
+        None,
+        allow_none=False,
+        help="location for the container group",
+    ).tag(config=True)
+    vnet_name = Unicode(
+        None,
+        allow_none=False,
+        help="azure virtual network name to deploy containers on",
+    ).tag(config=True)
+    subnet_name = Unicode(
+        None,
+        allow_none=False,
+        help="azure virtual network subnet name to deploy containers on",
+    ).tag(config=True)
     port = Int(
         80,
         allow_none=True,
-        help="",
+        help="port for the container to listen on",
+    ).tag(config=True)
+    container_cpu_limit = Float(
+        1.0,
+        allow_none=True,
+        help="how many CPUs to allocate to each container",
+    ).tag(config=True)
+    container_mem_limit = Int(
+        4,
+        allow_none=True,
+        help="how much memory to allocate to each container",
+    ).tag(config=True)
+    spawn_timeout = Int(
+        300,
+        allow_none=True,
+        help="timeout until spawn fails. azure spawning is slow, expect several minutes",
     ).tag(config=True)
     extra_paths = List(
         [],
@@ -52,17 +97,17 @@ class ACISpawner(Spawner):
         """,
     ).tag(config=True)
 
-    spawn_timeout = 600
-    container_cpu_limit = 1.0
-    container_mem_limit = 4
-    container_group_location = "West US 2"
-    container_port = 80
+    # spawn_timeout = 600
+    # container_cpu_limit = 1.0
+    # container_mem_limit = 4
+    # container_group_location = "West US 2"
+    # container_port = 80
 
-    subscription_id = "377758e9-c4a1-44d2-b701-fc556632fd3c"
-    resource_group = "jupyterhub-rg"
-    vnet_name = "jupyterhub-rg-vnet"
-    subnet_name = "ci"
-    container_image = "uojupyterhub.azurecr.io/jupyterhub/datascience-singleuser"
+    # subscription_id = "377758e9-c4a1-44d2-b701-fc556632fd3c"
+    # resource_group = "jupyterhub-rg"
+    # vnet_name = "jupyterhub-rg-vnet"
+    # subnet_name = "ci"
+    # container_image = "uojupyterhub.azurecr.io/jupyterhub/datascience-singleuser"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -72,6 +117,7 @@ class ACISpawner(Spawner):
             username=self.image_registry_username,
             password=self.image_registry_password,
         )
+        self.container_port = self.port
 
     def _expand_user_vars(self, string):
         """
@@ -121,9 +167,6 @@ class ACISpawner(Spawner):
         environment_variables = [
             EnvironmentVariable(name=k, value=v) for k, v in env.items()
         ]
-        # self.log.info(f"building container: ")
-        # self.log.info(f"name: {self.container_name}")
-        # self.log.info(f"image: {self.container_image}")
         container = Container(
             name=self.container_name,
             image=self.container_image,
@@ -154,14 +197,9 @@ class ACISpawner(Spawner):
             subnet_ids=subnet_ids,
         )
 
-        self.log.info("begin_create_or_update")
-        self.log.info(f"{self.resource_group=}")
-        self.log.info(f"{self.container_group_name=}")
-        self.log.info(f"{group=}")
         self.aci_client.container_groups.begin_create_or_update(
             self.resource_group, self.container_group_name, group
         )
-        self.log.info("after begin_create_or_update")
 
         return None
 
@@ -184,10 +222,7 @@ class ACISpawner(Spawner):
             )
 
         self.log.info("cmd: %s, env: %s", cmd, env)
-
-        self.log.info("spawning container")
         await self.spawn_container_group(cmd, env)
-        self.log.info("spawned container, starting poll")
 
         for _ in range(self.spawn_timeout):
             is_up = await self.poll()
@@ -195,11 +230,8 @@ class ACISpawner(Spawner):
                 container_group = self.aci_client.container_groups.get(
                     self.resource_group, self.container_group_name
                 )
-                net = container_group.ip_address
-                self.log.info(net)
-                ip = net.ip
-                port = net.ports[0].port
-                self.log.info(f"Returning ({ip=}, {port}")
+                ip = container_group.ip_address.ip
+                port = container_group.ip_address.ports[0].port
                 return (ip, port)
             await asyncio.sleep(1)
 
@@ -216,9 +248,6 @@ class ACISpawner(Spawner):
         state = container_group.instance_view.state
         self.log.info(f"{state}: {self.container_group_name}")
         if state == "Running":
-            self.log.info(type(container_group))
-            self.log.info(container_group)
-            self.log.info(f"{state}: {self.container_group_name}")
             return None
         return 0
 
