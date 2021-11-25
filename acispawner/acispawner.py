@@ -97,18 +97,6 @@ class ACISpawner(Spawner):
         """,
     ).tag(config=True)
 
-    # spawn_timeout = 600
-    # container_cpu_limit = 1.0
-    # container_mem_limit = 4
-    # container_group_location = "West US 2"
-    # container_port = 80
-
-    # subscription_id = "377758e9-c4a1-44d2-b701-fc556632fd3c"
-    # resource_group = "jupyterhub-rg"
-    # vnet_name = "jupyterhub-rg-vnet"
-    # subnet_name = "ci"
-    # container_image = "uojupyterhub.azurecr.io/jupyterhub/datascience-singleuser"
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.aci_client = self.create_aci_client()
@@ -148,8 +136,6 @@ class ACISpawner(Spawner):
 
     @property
     def container_group_name(self):
-        # this is temporary so i can create a bunch
-        # return f"z-jupyter-ci-{self.rand}"
         return f"z-jupyter-ci-{self.user.name}"
 
     @property
@@ -204,12 +190,8 @@ class ACISpawner(Spawner):
         return None
 
     async def start(self):
-        # get environment variables,
-        # several of which are required for configuring the single-user server
         env = self.get_env()
         cmd = []
-        # get jupyterhub command to run,
-        # typically ['jupyterhub-singleuser']
         cmd.extend(self.cmd)
         cmd.extend(self.get_args())
 
@@ -252,12 +234,16 @@ class ACISpawner(Spawner):
         return 0
 
     async def stop(self):
-        # group = self.aci_client.container_groups.get(
-        #     self.resource_group, self.container_group_name
-        # )
-        self.aci_client.container_groups.begin_delete(
-            self.resource_group, self.container_group_name
-        )
+        try:
+            group = self.aci_client.container_groups.get(
+                self.resource_group, self.container_group_name
+            )
+            self.log.info(f"deleting container group: {group}")
+            self.aci_client.container_groups.begin_delete(
+                self.resource_group, self.container_group_name
+            )
+        except Exception as e:
+            self.log.info(f"error deleting container group: {e}")
         yield None
 
     def get_state(self):
