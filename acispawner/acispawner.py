@@ -73,12 +73,6 @@ class ACISpawner(Spawner):
             password=self.image_registry_password,
         )
 
-        # temporary
-        import random
-        import string
-
-        self.rand = "".join(random.choices(string.ascii_lowercase, k=8))
-
     def _expand_user_vars(self, string):
         """
         Expand user related variables in a given string
@@ -104,13 +98,13 @@ class ACISpawner(Spawner):
         ]
 
     def subnet_id(self):
-        return f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}/providers/Microsoft.Network/virtualNetworks/{self.vnet_name}/subnets/{self.subnet_name}",
+        return f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}/providers/Microsoft.Network/virtualNetworks/{self.vnet_name}/subnets/{self.subnet_name}"
 
     @property
     def container_group_name(self):
         # this is temporary so i can create a bunch
-        return f"z-jupyter-ci-{self.rand}"
-        # return f"jupyter-ci-{self.user.name}"
+        # return f"z-jupyter-ci-{self.rand}"
+        return f"z-jupyter-ci-{self.user.name}"
 
     @property
     def container_name(self):
@@ -208,9 +202,9 @@ class ACISpawner(Spawner):
         container_group = self.aci_client.container_groups.get(
             self.resource_group, self.container_group_name
         )
-        state = container_group.provisioning_state
+        state = container_group.instance_view.state
         self.log.info(f"{state}: {self.container_group_name}")
-        if state == "Succeeded":
+        if state == "Running":
             self.log.info(type(container_group))
             self.log.info(container_group)
             self.log.info(f"{state}: {self.container_group_name}")
@@ -219,27 +213,27 @@ class ACISpawner(Spawner):
 
     async def stop(self):
         # group = self.aci_client.container_groups.get(
-        #     "jupyterhub-rg", self.container_group_name
+        #     self.resource_group, self.container_group_name
         # )
-        # self.aci_client.container_groups.begin_delete(
-        #     "jupyterhub-rg", self.container_group_name, group
-        # )
+        self.aci_client.container_groups.begin_delete(
+            self.resource_group, self.container_group_name
+        )
         yield None
 
     def get_state(self):
         """get the current state"""
         state = super().get_state()
-        if self.pid:
-            state["pid"] = self.pid
+        if self.container_group_name:
+            state["dummy"] = self.dummy
         return state
 
     def load_state(self, state):
         """load state from the database"""
         super().load_state(state)
-        if "pid" in state:
-            self.pid = state["pid"]
+        if "container_group_name" in state:
+            self.dummy = state["dummy"]
 
     def clear_state(self):
         """clear any state (called after shutdown)"""
         super().clear_state()
-        self.pid = 0
+        self.dummy = ""
