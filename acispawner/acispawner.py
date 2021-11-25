@@ -142,7 +142,31 @@ class ACISpawner(Spawner):
     def container_name(self):
         return f"jupyter-{self.user.name}"
 
-    async def spawn_container_group(self, cmd, env):
+    def get_container_group(self):
+        try:
+            return self.aci_client.container_groups.get(
+                self.resource_group, self.container_group_name
+            )
+        except Exception as e:
+            self.log.info(f"error getting container: {e}")
+            return None
+
+    def create_container_group(self, group):
+        self.aci_client.container_groups.begin_create_or_update(
+            self.resource_group, self.container_group_name, group
+        )
+
+    def delete_container_group(self):
+        self.aci_client.container_groups.begin_delete(
+            self.resource_group, self.container_group_name
+        )
+
+    def start_container_group(self, container_group):
+        self.aci_client.container_groups.begin_start(
+            self.resource_group, self.container_group_name
+        )
+
+    def build_container_request(self, cmd, env):
         container_resource_requests = ResourceRequests(
             memory_in_gb=self.container_mem_limit,
             cpu=self.container_cpu_limit,
@@ -161,7 +185,9 @@ class ACISpawner(Spawner):
             command=cmd,
             environment_variables=environment_variables,
         )
+        return container
 
+    def build_container_group_request(self, container):
         # configure the container group
         subnet_ids = [
             ContainerGroupSubnetId(
@@ -182,11 +208,24 @@ class ACISpawner(Spawner):
             image_registry_credentials=self.acr_credentials,
             subnet_ids=subnet_ids,
         )
+        return group
 
-        self.aci_client.container_groups.begin_create_or_update(
-            self.resource_group, self.container_group_name, group
-        )
+    def get_api_token(self, container_group):
+        container = container_group.containers[0]
+        for ev in container.environmentVariables:
+            if ev["name"].startswith(("JPY_API_TOKEN=", "JUPYTERHUB_API_TOKEN=")):
+                return ev["value"]
 
+    def get_ip_port(self, container_group):
+        net = container_group.ip_address
+        ip = net.ip
+        port = net.ports[0].port
+        return ip, port
+
+    async def spawn_container_group(self, cmd, env):
+        container = self.build_container_request(cmd, env)
+        group = self.build_container_group_request(container)
+        self.create_container_group(group)
         return None
 
     async def start(self):
@@ -203,21 +242,29 @@ class ACISpawner(Spawner):
                 ),
             )
 
-        self.log.info("cmd: %s, env: %s", cmd, env)
+        self.log.info(f"cmd: {cmd}, env: {env}")
+
+        container_group = self.get_container_group()
+        # TODO implement "remove" option to remove the container if it exists
+
+        if container_group:
+            self.api_token = self.get_api_token(container_group)
+            # TODO implement start if not running
+            # self.start_container_group(container_group)
+            ip, port = self.get_ip_port(container_group)
+            return (ip, port)
+
+        # Otherwise, it doesn't exist, create it
         await self.spawn_container_group(cmd, env)
 
         for _ in range(self.spawn_timeout):
             is_up = await self.poll()
             if is_up is None:
-                container_group = self.aci_client.container_groups.get(
-                    self.resource_group, self.container_group_name
-                )
-                net = container_group.ip_address
-                ip = net.ip
-                port = net.ports[0].port
+                # this means it's up
+                container_group = self.get_container_group()
+                ip, port = self.get_ip_port(container_group)
                 return (ip, port)
             await asyncio.sleep(1)
-
         return None
 
     async def poll(self):
@@ -225,9 +272,7 @@ class ACISpawner(Spawner):
         Return None if running
         Otherwise integer exit status
         """
-        container_group = self.aci_client.container_groups.get(
-            self.resource_group, self.container_group_name
-        )
+        container_group = self.get_container_group()
         state = container_group.provisioning_state
         self.log.info(f"{state}: {self.container_group_name}")
         if state == "Succeeded":
@@ -236,15 +281,11 @@ class ACISpawner(Spawner):
 
     async def stop(self):
         try:
-            group = self.aci_client.container_groups.get(
-                self.resource_group, self.container_group_name
-            )
-            self.log.info(f"deleting container group: {group}")
-            self.aci_client.container_groups.begin_delete(
-                self.resource_group, self.container_group_name
-            )
+            container_group = self.get_container_group()
+            self.log.debug(f"deleting container group: {container_group}")
+            self.delete_container_group()
         except Exception as e:
-            self.log.info(f"error deleting container group: {e}")
+            self.log.error(f"error deleting container group: {e}")
         return None
 
     def get_state(self):
@@ -257,8 +298,8 @@ class ACISpawner(Spawner):
     def load_state(self, state):
         """load state from the database"""
         super().load_state(state)
-        # if "container_group_name" in state:
-        #     self.container_group_name = state["container_group_name"]
+        if "container_group_name" in state:
+            self.container_group_name = state["container_group_name"]
 
     def clear_state(self):
         """clear any state (called after shutdown)"""
