@@ -104,9 +104,7 @@ class ACISpawner(Spawner):
         ]
 
     def subnet_id(self):
-        return (
-            f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}/providers/Microsoft.Network/virtualNetworks/{self.vnet_name}/subnets/{self.subnet_name}",
-        )
+        return f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}/providers/Microsoft.Network/virtualNetworks/{self.vnet_name}/subnets/{self.subnet_name}",
 
     @property
     def container_group_name(self):
