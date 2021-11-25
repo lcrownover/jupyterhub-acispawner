@@ -155,6 +155,9 @@ class ACISpawner(Spawner):
         )
 
         self.log.info("begin_create_or_update")
+        self.log.info("{self.resource_group=}")
+        self.log.info("{self.container_group_name=}")
+        self.log.info("{group=}")
         self.aci_client.container_groups.begin_create_or_update(
             self.resource_group, self.container_group_name, group
         )
