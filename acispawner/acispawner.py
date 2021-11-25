@@ -151,6 +151,7 @@ class ACISpawner(Spawner):
             subnet_ids=subnet_ids,
         )
 
+        self.log.info("begin_create_or_update")
         self.aci_client.container_groups.begin_create_or_update(
             self.resource_group, self.container_group_name, group
         )
