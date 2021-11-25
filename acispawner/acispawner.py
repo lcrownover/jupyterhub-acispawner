@@ -212,8 +212,9 @@ class ACISpawner(Spawner):
                 container_group = self.aci_client.container_groups.get(
                     self.resource_group, self.container_group_name
                 )
-                ip = container_group.ip_address.ip
-                port = container_group.ip_address.ports[0].port
+                net = container_group.ip_address
+                ip = net.ip
+                port = net.ports[0].port
                 return (ip, port)
             await asyncio.sleep(1)
 
