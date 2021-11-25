@@ -178,7 +178,9 @@ class ACISpawner(Spawner):
 
         self.log.info("cmd: %s, env: %s", cmd, env)
 
+        self.log.info("spawning container")
         await self.spawn_container_group(cmd, env)
+        self.log.info("spawned container, starting poll")
 
         for _ in range(self.spawn_timeout):
             is_up = await self.poll()
