@@ -62,7 +62,7 @@ class ACISpawner(Spawner):
     resource_group = "jupyterhub-rg"
     vnet_name = "jupyterhub-rg-vnet"
     subnet_name = "ci"
-    contaiiner_image = "uojupyterhub.azurecr.io/jupyterhub/datascience-singleuser"
+    container_image = "uojupyterhub.azurecr.io/jupyterhub/datascience-singleuser"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -131,7 +131,7 @@ class ACISpawner(Spawner):
         ]
         container = Container(
             name=self.container_name,
-            image=self.contaiiner_image,
+            image=self.container_image,
             resources=container_resource_requirements,
             ports=[ContainerPort(port=self.container_port)],
             command=cmd,
