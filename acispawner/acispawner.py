@@ -121,6 +121,9 @@ class ACISpawner(Spawner):
         environment_variables = [
             EnvironmentVariable(name=k, value=v) for k, v in env.items()
         ]
+        self.log.info(f"building container: ")
+        self.log.info(f"name: {self.container_name}")
+        self.log.info(f"image: {self.container_image}")
         container = Container(
             name=self.container_name,
             image=self.container_image,
