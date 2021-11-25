@@ -121,9 +121,9 @@ class ACISpawner(Spawner):
         environment_variables = [
             EnvironmentVariable(name=k, value=v) for k, v in env.items()
         ]
-        self.log.info(f"building container: ")
-        self.log.info(f"name: {self.container_name}")
-        self.log.info(f"image: {self.container_image}")
+        # self.log.info(f"building container: ")
+        # self.log.info(f"name: {self.container_name}")
+        # self.log.info(f"image: {self.container_image}")
         container = Container(
             name=self.container_name,
             image=self.container_image,
@@ -210,9 +210,14 @@ class ACISpawner(Spawner):
         container_group = self.aci_client.container_groups.get(
             self.resource_group, self.container_group_name
         )
-        state = container_group.instance_view["state"]
+        try:
+            self.log.info(f"instance_view.state: {container_group.instance_view.state}")
+        except:
+            self.log.info("failed to get instance view state")
+
+        state = container_group.provisioning_state
         self.log.info(f"{state}: {self.container_group_name}")
-        if state == "Running":
+        if state == "Succeeded":
             self.log.info(type(container_group))
             self.log.info(container_group)
             self.log.info(f"{state}: {self.container_group_name}")
