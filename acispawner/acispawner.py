@@ -189,6 +189,7 @@ class ACISpawner(Spawner):
                 self.log.info(net)
                 ip = net.ip
                 port = net.ports[0].port
+                self.log.info(f"Returning ({ip=}, {port}")
                 return (ip, port)
             await asyncio.sleep(1)
 
