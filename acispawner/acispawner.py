@@ -206,7 +206,7 @@ class ACISpawner(Spawner):
         container_group = self.aci_client.container_groups.get(
             self.resource_group, self.container_group_name
         )
-        state = container_group.instance_view.state
+        state = container_group.instance_view["state"]
         self.log.info(f"{state}: {self.container_group_name}")
         if state == "Running":
             self.log.info(type(container_group))
