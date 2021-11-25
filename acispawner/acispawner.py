@@ -72,6 +72,8 @@ class ACISpawner(Spawner):
             username=self.image_registry_username,
             password=self.image_registry_password,
         )
+        self.container_group_name = self.make_container_group_name()
+        self.container_name = self.make_container_name()
 
     def _expand_user_vars(self, string):
         """
@@ -100,14 +102,12 @@ class ACISpawner(Spawner):
     def subnet_id(self):
         return f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}/providers/Microsoft.Network/virtualNetworks/{self.vnet_name}/subnets/{self.subnet_name}"
 
-    @property
-    def container_group_name(self):
+    def make_container_group_name(self):
         # this is temporary so i can create a bunch
         # return f"z-jupyter-ci-{self.rand}"
         return f"z-jupyter-ci-{self.user.name}"
 
-    @property
-    def container_name(self):
+    def make_container_name(self):
         return f"jupyter-{self.user.name}"
 
     async def spawn_container_group(self, cmd, env):
@@ -224,16 +224,16 @@ class ACISpawner(Spawner):
         """get the current state"""
         state = super().get_state()
         if self.container_group_name:
-            state["dummy"] = self.dummy
+            state["container_group_name"] = self.container_group_name
         return state
 
     def load_state(self, state):
         """load state from the database"""
         super().load_state(state)
         if "container_group_name" in state:
-            self.dummy = state["dummy"]
+            self.container_group_name = state["container_group_name"]
 
     def clear_state(self):
         """clear any state (called after shutdown)"""
         super().clear_state()
-        self.dummy = ""
+        self.container_group_name = ""
