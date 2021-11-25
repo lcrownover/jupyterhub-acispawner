@@ -228,9 +228,9 @@ class ACISpawner(Spawner):
         container_group = self.aci_client.container_groups.get(
             self.resource_group, self.container_group_name
         )
-        state = container_group.instance_view.state
+        state = container_group.provisioning_state
         self.log.info(f"{state}: {self.container_group_name}")
-        if state == "Running":
+        if state == "Succeeded":
             return None
         return 0
 
@@ -245,7 +245,7 @@ class ACISpawner(Spawner):
             )
         except Exception as e:
             self.log.info(f"error deleting container group: {e}")
-        yield None
+        return None
 
     def get_state(self):
         """get the current state"""
