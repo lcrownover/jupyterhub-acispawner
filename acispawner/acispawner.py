@@ -213,14 +213,9 @@ class ACISpawner(Spawner):
         container_group = self.aci_client.container_groups.get(
             self.resource_group, self.container_group_name
         )
-        try:
-            self.log.info(f"instance_view.state: {container_group.instance_view.state}")
-        except:
-            self.log.info("failed to get instance view state")
-
-        state = container_group.provisioning_state
+        state = container_group.instance_view.state
         self.log.info(f"{state}: {self.container_group_name}")
-        if state == "Succeeded":
+        if state == "Running":
             self.log.info(type(container_group))
             self.log.info(container_group)
             self.log.info(f"{state}: {self.container_group_name}")
