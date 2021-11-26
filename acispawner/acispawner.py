@@ -57,7 +57,7 @@ class ACISpawner(Spawner):
         allow_none=True,
         help="storage quota in GB for each user share",
     ).tag(config=True)
-    storage_access_tier = Int(
+    storage_access_tier = Unicode(
         "Hot",
         allow_none=True,
         help="storage access tier for each user share",
