@@ -274,9 +274,12 @@ class ACISpawner(Spawner):
 
     def get_api_token(self, container_group):
         container = container_group.containers[0]
-        for ev in container.environmentVariables:
-            if ev["name"].startswith(("JPY_API_TOKEN=", "JUPYTERHUB_API_TOKEN=")):
-                return ev["value"]
+        try:
+            for ev in container.environmentVariables:
+                if ev["name"].startswith(("JPY_API_TOKEN=", "JUPYTERHUB_API_TOKEN=")):
+                    return ev["value"]
+        except:
+            return None
 
     def get_ip_port(self, container_group):
         net = container_group.ip_address
@@ -313,11 +316,13 @@ class ACISpawner(Spawner):
         # TODO implement "remove" option to remove the container if it exists if the user wants
 
         if container_group:
-            self.api_token = self.get_api_token(container_group)
-            # TODO implement start if not running
-            # self.start_container_group(container_group)
-            ip, port = self.get_ip_port(container_group)
-            return (ip, port)
+            api_token = self.get_api_token(container_group)
+            if api_token:
+                self.api_token = api_token
+                # TODO implement start if not running
+                # self.start_container_group(container_group)
+                ip, port = self.get_ip_port(container_group)
+                return (ip, port)
 
         self.log.info("checking share")
         await self.create_share_if_not_exist()
