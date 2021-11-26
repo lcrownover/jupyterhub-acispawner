@@ -107,6 +107,11 @@ class ACISpawner(Spawner):
         allow_none=True,
         help="how much memory to allocate to each container",
     ).tag(config=True)
+    serverless_users = List(
+        [],
+        allow_none=True,
+        help="list of usernames that should always fail spawning resources. used for the admin account",
+    ).tag(config=True)
     spawn_timeout = Int(
         300,
         allow_none=True,
@@ -324,6 +329,9 @@ class ACISpawner(Spawner):
         return None
 
     async def start(self):
+        if self.user.name in self.serverless_users:
+            self.log.info(f"{self.user.name} configured as serverless, failing spawn")
+            return None
         env = self.get_env()
         cmd = []
         cmd.extend(self.cmd)
