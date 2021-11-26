@@ -228,8 +228,9 @@ class ACISpawner(Spawner):
                 quota=self.storage_quota,
                 access_tier=self.storage_access_tier,
             )
-        except:
-            self.log.warn(f"tried to create share: {self.share_name} but it already exists")
+        except Exception as e:
+            self.log.info(e)
+            self.log.info(f"tried to create share: {self.share_name} but it already exists")
 
 
 
