@@ -20,6 +20,7 @@ from azure.mgmt.containerinstance.models import (
     VolumeMount,
 )
 from azure.identity import DefaultAzureCredential
+from azure.storage.fileshare import ShareServiceClient
 
 from jupyterhub.spawner import Spawner
 from traitlets import List, Unicode, Int, Float, Bool
@@ -118,6 +119,7 @@ class ACISpawner(Spawner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.aci_client = self.create_aci_client()
+        self.storage_client = self.create_storage_client()
         self.acr_credentials = self.set_acr_credentials(
             server=self.image_registry_server,
             username=self.image_registry_username,
@@ -139,6 +141,10 @@ class ACISpawner(Spawner):
         credential = DefaultAzureCredential()
         subscription_id = self.subscription_id
         return ContainerInstanceManagementClient(credential, subscription_id)
+
+    def create_storage_client(self):
+        account_url = f"https://{self.storage_account_name}.file.core.windows.net/"
+        return ShareServiceClient(account_url=account_url, credential=self.storage_account_key)
 
     def set_acr_credentials(self, server, username, password):
         return [
@@ -200,6 +206,22 @@ class ACISpawner(Spawner):
             )
         )
         return [v]
+
+    async def create_share(self):
+        await self.storage_client.create_share(share_name=self.user.name, quota=2000000000)
+        return None
+
+    async def share_exists(self):
+        shares = list(self.storage_client.list_shares())
+        for share in shares:
+            if share.name == self.user.name:
+                return True
+        return False
+
+    async def create_share_if_not_exist(self):
+        if not self.share_exists:
+            await self.create_share()
+        return None
 
     def build_container_request(self, cmd, env):
         container_resource_requests = ResourceRequests(
@@ -295,6 +317,8 @@ class ACISpawner(Spawner):
             ip, port = self.get_ip_port(container_group)
             return (ip, port)
 
+        await self.create_share_if_not_exist()
+
         # Otherwise, it doesn't exist, create it
         await self.spawn_container_group(cmd, env)
 
@@ -302,10 +326,11 @@ class ACISpawner(Spawner):
         poll_sleep = 10
         poll_timeout = int(self.spawn_timeout / poll_sleep)
 
-        for _ in range(poll_timeout):
+        for s in range(poll_timeout):
+            self.log.info(f"polling {self.container_group_name} elapsed: {s*poll_sleep}")
             is_up = await self.poll()
-            if is_up is None:
-                # this means it's up
+            if is_up is None: # None == it's done
+                self.log.info(f"ready {self.container_group_name} elapsed: {s*poll_sleep}")
                 container_group = self.get_container_group()
                 ip, port = self.get_ip_port(container_group)
                 return (ip, port)
@@ -319,7 +344,6 @@ class ACISpawner(Spawner):
         """
         container_group = self.get_container_group()
         state = container_group.provisioning_state
-        # self.log.info(f"{state}: {self.container_group_name}")
         if state == "Succeeded":
             return None
         return 0
