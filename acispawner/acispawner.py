@@ -213,6 +213,8 @@ class ACISpawner(Spawner):
     async def share_exists(self):
         shares = list(self.storage_client.list_shares())
         for share in shares:
+            self.log.info(f"share: {share}")
+        for share in shares:
             if share.name == self.user.name:
                 return True
         return False
