@@ -6,4 +6,4 @@ RUN pip3 install --no-cache \
     datascience \
     otter-grader
 
-RUN bash -c 'echo [[ -d ~/work ]] && cd ~/work >> /home/jovyan/.bashrc'
+RUN bash -c 'echo "[[ -d /home/jovyan/work ]] && cd /home/jovyan/work" >> /home/jovyan/.bashrc'

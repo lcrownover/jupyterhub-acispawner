@@ -95,3 +95,8 @@
       name: nginx
       state: started
       enabled: yes
+
+  - name: add class_manager user for admin tasks
+    user:
+      name: class_manager
+      password: {{ class_manager_password | password_hash('sha512') }}
