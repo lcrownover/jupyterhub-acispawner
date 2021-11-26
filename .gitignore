@@ -1,5 +1,6 @@
 # custom
 
+scripts/config.py
 ansible/src
 ansible/vars.yaml
 ansible/.ansible-lint
