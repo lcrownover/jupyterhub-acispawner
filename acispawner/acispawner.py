@@ -224,7 +224,7 @@ class ACISpawner(Spawner):
     async def create_share(self):
         try:
             await self.storage_client.create_share(
-                share_name=self.user.name,
+                share_name=self.share_name,
                 quota=self.storage_quota,
                 access_tier=self.storage_access_tier,
             )
