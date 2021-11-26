@@ -281,12 +281,12 @@ class ACISpawner(Spawner):
             )
 
         if self.allow_insecure_writes:
-            env["JUPYTER_ALLOW_INSECURE_WRITES"] = "yes"
+            env["JUPYTER_ALLOW_INSECURE_WRITES"] = "true"
 
         self.log.info(f"cmd: {cmd}, env: {env}")
 
         container_group = self.get_container_group()
-        # TODO implement "remove" option to remove the container if it exists
+        # TODO implement "remove" option to remove the container if it exists if the user wants
 
         if container_group:
             self.api_token = self.get_api_token(container_group)
@@ -298,14 +298,18 @@ class ACISpawner(Spawner):
         # Otherwise, it doesn't exist, create it
         await self.spawn_container_group(cmd, env)
 
-        for _ in range(self.spawn_timeout):
+        # Poll every 10 seconds, calculate timeout based on that.
+        poll_sleep = 10
+        poll_timeout = int(self.spawn_timeout / poll_sleep)
+
+        for _ in range(poll_timeout):
             is_up = await self.poll()
             if is_up is None:
                 # this means it's up
                 container_group = self.get_container_group()
                 ip, port = self.get_ip_port(container_group)
                 return (ip, port)
-            await asyncio.sleep(1)
+            await asyncio.sleep(poll_sleep)
         return None
 
     async def poll(self):
@@ -315,7 +319,7 @@ class ACISpawner(Spawner):
         """
         container_group = self.get_container_group()
         state = container_group.provisioning_state
-        self.log.info(f"{state}: {self.container_group_name}")
+        # self.log.info(f"{state}: {self.container_group_name}")
         if state == "Succeeded":
             return None
         return 0
