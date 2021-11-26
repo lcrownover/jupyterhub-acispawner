@@ -211,7 +211,7 @@ class ACISpawner(Spawner):
         await self.storage_client.create_share(share_name=self.user.name, quota=2000000000)
         return None
 
-    async def share_exists(self):
+    def share_exists(self):
         shares = list(self.storage_client.list_shares())
         for share in shares:
             if share.name == self.user.name:
@@ -219,10 +219,10 @@ class ACISpawner(Spawner):
                 return True
         return False
 
-    async def create_share_if_not_exist(self):
+    def create_share_if_not_exist(self):
         if not self.share_exists:
             self.log.info(f"creating new share for: {self.user.name}")
-            await self.create_share()
+            self.create_share()
         return None
 
     def build_container_request(self, cmd, env):
@@ -319,7 +319,7 @@ class ACISpawner(Spawner):
             ip, port = self.get_ip_port(container_group)
             return (ip, port)
 
-        await self.create_share_if_not_exist()
+        self.create_share_if_not_exist()
 
         # Otherwise, it doesn't exist, create it
         await self.spawn_container_group(cmd, env)
@@ -329,10 +329,10 @@ class ACISpawner(Spawner):
         poll_timeout = int(self.spawn_timeout / poll_sleep)
 
         for s in range(poll_timeout):
-            self.log.info(f"polling {self.container_group_name} elapsed: {s*poll_sleep}")
+            self.log.info(f"polling {self.container_group_name} elapsed: {s*poll_sleep}s")
             is_up = await self.poll()
             if is_up is None: # None == it's done
-                self.log.info(f"ready {self.container_group_name} elapsed: {s*poll_sleep}")
+                self.log.info(f"ready {self.container_group_name} elapsed: {s*poll_sleep}s")
                 container_group = self.get_container_group()
                 ip, port = self.get_ip_port(container_group)
                 return (ip, port)
