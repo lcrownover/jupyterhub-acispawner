@@ -220,7 +220,7 @@ class ACISpawner(Spawner):
         return False
 
     def create_share_if_not_exist(self):
-        if not self.share_exists:
+        if not self.share_exists():
             self.log.info(f"creating new share for: {self.user.name}")
             self.create_share()
         return None
