@@ -25,5 +25,6 @@ setup(
         "azure-mgmt-containerinstance>=1.5.0",
         "msrestazure",
         "azure-identity",
+        "azure-storage-file-share",
     ],
 )
