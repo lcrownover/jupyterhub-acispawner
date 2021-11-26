@@ -217,7 +217,7 @@ class ACISpawner(Spawner):
         v = Volume(
             name=self.share_name,
             azure_file=AzureFileVolume(
-                share_name=self.user.name,
+                share_name=self.share_name,
                 storage_account_name=self.storage_account_name,
                 storage_account_key=self.storage_account_key,
             )
@@ -250,8 +250,7 @@ class ACISpawner(Spawner):
 
     async def create_share_if_not_exist(self):
         self.log.info(f"checking share exists: {self.user.name}")
-        exists = await self.share_exists()
-        if not exists:
+        if not await self.share_exists():
             self.log.info(f"creating new share for: {self.user.name}")
             await self.create_share()
         self.log.info(f"found existing share for: {self.user.name}")
