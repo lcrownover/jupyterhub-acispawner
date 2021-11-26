@@ -1,5 +1,8 @@
 # custom
 
+ansible/src
+ansible/vars.yaml
+ansible/.ansible-lint
 manual_spawn.py
 venv
 acispawner/acispawner_from_systemd.py
