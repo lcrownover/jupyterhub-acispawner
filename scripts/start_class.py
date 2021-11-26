@@ -5,12 +5,15 @@ import requests
 import config
 
 token = config.API_TOKEN
+headers = {
+    "Authorization": f"token {token}",
+    "Content-Type": "application/json",
+}
+server = "http://uo-jupyterhub.westus2.cloudapp.azure.com"
 
 usernames = ['jupytertest', 'mshepard']
 
-server = "http://uo-jupyterhub.westus2.cloudapp.azure.com"
-
 for username in usernames:
-    r = requests.post(f"{server}/users/{username}/server", headers={"Authorization": f"token {token}"})
+    r = requests.post(f"{server}/hub/api/users/{username}/server", headers=headers)
     print(r.text)
 

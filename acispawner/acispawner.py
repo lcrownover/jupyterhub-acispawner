@@ -195,7 +195,7 @@ class ACISpawner(Spawner):
             except Exception as e:
                 if 'is still transitioning, please retry later' in str(e):
                     self.log.info(f"container is still transitioning, waiting 10s then trying again")
-                    asyncio.sleep(10)
+                    await asyncio.sleep(10)
 
     def delete_container_group(self):
         self.aci_client.container_groups.begin_delete(
@@ -230,7 +230,7 @@ class ACISpawner(Spawner):
 
     async def create_share(self):
         try:
-            await self.storage_client.create_share(
+            self.storage_client.create_share(
                 share_name=self.share_name,
                 quota=self.storage_quota,
                 access_tier=self.storage_access_tier,
