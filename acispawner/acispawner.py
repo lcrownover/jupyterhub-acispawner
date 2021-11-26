@@ -202,13 +202,13 @@ class ACISpawner(Spawner):
 
     def container_volume_mounts(self):
         return [VolumeMount(
-            name=self.user.name,
+            name=self.share_name,
             mount_path="/home/jovyan",
         )]
 
     def group_volumes(self):
         v = Volume(
-            name=self.user.name,
+            name=self.share_name,
             azure_file=AzureFileVolume(
                 share_name=self.user.name,
                 storage_account_name=self.storage_account_name,
@@ -216,6 +216,10 @@ class ACISpawner(Spawner):
             )
         )
         return [v]
+
+    @property
+    def share_name(self):
+        return f"vol-{self.user.name}"
 
     async def create_share(self):
         await self.storage_client.create_share(
@@ -229,7 +233,7 @@ class ACISpawner(Spawner):
         for share in shares:
             self.log.info(f"share: {share}")
         for share in shares:
-            if share.name == self.user.name:
+            if share.name == self.share_name:
                 return True
         return False
 
