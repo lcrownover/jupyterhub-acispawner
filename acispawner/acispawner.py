@@ -346,13 +346,17 @@ class ACISpawner(Spawner):
         # TODO implement "remove" option to remove the container if it exists if the user wants
 
         if container_group:
-            api_token = self.get_api_token(container_group)
-            if api_token:
-                self.api_token = api_token
-                # TODO implement start if not running
-                # self.start_container_group(container_group)
-                ip, port = self.get_ip_port(container_group)
-                return (ip, port)
+            if not container_group.provisioning_state == "Succeeded":
+                self.delete_container_group()
+                await asyncio.sleep(5) # make sure it's deleted... should probably poll this
+            else:
+                api_token = self.get_api_token(container_group)
+                if api_token:
+                    self.api_token = api_token
+                    # TODO implement start if not running
+                    # self.start_container_group(container_group)
+                    ip, port = self.get_ip_port(container_group)
+                    return (ip, port)
 
         await self.create_share_if_not_exist()
 
@@ -383,6 +387,8 @@ class ACISpawner(Spawner):
         state = container_group.provisioning_state
         if state == "Succeeded":
             return None
+        if state == "Repairing":
+            return 1
         return 0
 
     async def stop(self):
