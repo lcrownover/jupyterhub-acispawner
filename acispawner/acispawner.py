@@ -57,6 +57,11 @@ class ACISpawner(Spawner):
         allow_none=True,
         help="storage quota in GB for each user share",
     ).tag(config=True)
+    storage_access_tier = Int(
+        "Hot",
+        allow_none=True,
+        help="storage access tier for each user share",
+    ).tag(config=True)
     container_image = Unicode(
         None,
         allow_none=False,
@@ -213,7 +218,11 @@ class ACISpawner(Spawner):
         return [v]
 
     async def create_share(self):
-        await self.storage_client.create_share(share_name=self.user.name, quota=self.storage_quota)
+        await self.storage_client.create_share(
+            share_name=self.user.name,
+            quota=self.storage_quota,
+            access_tier=self.storage_access_tier,
+        )
 
     async def share_exists(self):
         shares = list(self.storage_client.list_shares())
