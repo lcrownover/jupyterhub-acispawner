@@ -222,11 +222,16 @@ class ACISpawner(Spawner):
         return f"vol-{self.user.name}"
 
     async def create_share(self):
-        await self.storage_client.create_share(
-            share_name=self.user.name,
-            quota=self.storage_quota,
-            access_tier=self.storage_access_tier,
-        )
+        try:
+            await self.storage_client.create_share(
+                share_name=self.user.name,
+                quota=self.storage_quota,
+                access_tier=self.storage_access_tier,
+            )
+        except:
+            self.log.warn(f"tried to create share: {self.share_name} but it already exists")
+
+
 
     async def share_exists(self):
         shares = list(self.storage_client.list_shares())
