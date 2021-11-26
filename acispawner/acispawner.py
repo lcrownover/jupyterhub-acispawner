@@ -209,21 +209,21 @@ class ACISpawner(Spawner):
 
     async def create_share(self):
         await self.storage_client.create_share(share_name=self.user.name, quota=2000000000)
-        return None
 
     async def share_exists(self):
         shares = list(self.storage_client.list_shares())
         for share in shares:
             if share.name == self.user.name:
-                self.log.info(f"found existing share for: {self.user.name}")
                 return True
         return False
 
     async def create_share_if_not_exist(self):
-        if not await self.share_exists():
+        self.log.info(f"checking share exists: {self.user.name}")
+        exists = self.share_exists()
+        if not exists:
             self.log.info(f"creating new share for: {self.user.name}")
             await self.create_share()
-        return None
+        self.log.info(f"found existing share for: {self.user.name}")
 
     def build_container_request(self, cmd, env):
         container_resource_requests = ResourceRequests(
