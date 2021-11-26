@@ -210,7 +210,7 @@ class ACISpawner(Spawner):
     def container_volume_mounts(self):
         return [VolumeMount(
             name=self.share_name,
-            mount_path="/home/jovyan/data",
+            mount_path="/home/jovyan/work",
         )]
 
     def group_volumes(self):
