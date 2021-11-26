@@ -1,4 +1,4 @@
-FROM jupyter/datascience-notebook:latest
+FROM jupyter/datascience-notebook
 
-RUN pip3 install --no-cache jupyterhub jupyter
+RUN pip3 install --no-cache jupyterhub==1.5.0
 

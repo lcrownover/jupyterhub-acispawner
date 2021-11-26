@@ -22,7 +22,7 @@ from azure.mgmt.containerinstance.models import (
 from azure.identity import DefaultAzureCredential
 
 from jupyterhub.spawner import Spawner
-from traitlets import List, Unicode, Int, Float
+from traitlets import List, Unicode, Int, Float, Bool
 
 
 class ACISpawner(Spawner):
@@ -108,6 +108,11 @@ class ACISpawner(Spawner):
 
         {USERNAME} and {USERID} are expanded
         """,
+    ).tag(config=True)
+    allow_insecure_writes = Bool(
+        True,
+        allow_none=True,
+        help="azure files mount with 777 permissions, jupyter needs to be okay with this",
     ).tag(config=True)
 
     def __init__(self, *args, **kwargs):
@@ -274,6 +279,9 @@ class ACISpawner(Spawner):
                     [self._expand_user_vars(p) for p in self.extra_paths]
                 ),
             )
+
+        if self.allow_insecure_writes:
+            env["JUPYTER_ALLOW_INSECURE_WRITES"] = "yes"
 
         self.log.info(f"cmd: {cmd}, env: {env}")
 
