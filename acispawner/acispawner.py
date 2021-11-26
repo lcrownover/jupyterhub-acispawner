@@ -320,7 +320,7 @@ class ACISpawner(Spawner):
             return (ip, port)
 
         self.log.info("checking share")
-        self.create_share_if_not_exist()
+        # self.create_share_if_not_exist()
 
         # Otherwise, it doesn't exist, create it
         await self.spawn_container_group(cmd, env)
