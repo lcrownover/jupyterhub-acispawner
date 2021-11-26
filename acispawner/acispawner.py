@@ -3,6 +3,7 @@ import os
 
 from azure.mgmt.containerinstance import ContainerInstanceManagementClient
 from azure.mgmt.containerinstance.models import (
+    AzureFileVolume,
     Container,
     ContainerGroup,
     ContainerGroupNetworkProtocol,
@@ -15,6 +16,8 @@ from azure.mgmt.containerinstance.models import (
     Port,
     ResourceRequests,
     ResourceRequirements,
+    Volume,
+    VolumeMount,
 )
 from azure.identity import DefaultAzureCredential
 
@@ -37,6 +40,16 @@ class ACISpawner(Spawner):
         None,
         allow_none=False,
         help="image registry server",
+    ).tag(config=True)
+    storage_account_name = Unicode(
+        None,
+        allow_none=False,
+        help="storage account name for mounted storage",
+    ).tag(config=True)
+    storage_account_key = Unicode(
+        None,
+        allow_none=False,
+        help="storage account key for mounted storage",
     ).tag(config=True)
     container_image = Unicode(
         None,
@@ -161,10 +174,27 @@ class ACISpawner(Spawner):
             self.resource_group, self.container_group_name
         )
 
-    def start_container_group(self, container_group):
+    def start_container_group(self):
         self.aci_client.container_groups.begin_start(
             self.resource_group, self.container_group_name
         )
+
+    def container_volume_mounts(self):
+        return [VolumeMount(
+            name=self.user.name,
+            mount_path="/home/jovyan",
+        )]
+
+    def group_volumes(self):
+        v = Volume(
+            name=self.user.name,
+            azure_file=AzureFileVolume(
+                share_name=self.user.name,
+                storage_account_name=self.storage_account_name,
+                storage_account_key=self.storage_account_key,
+            )
+        )
+        return [v]
 
     def build_container_request(self, cmd, env):
         container_resource_requests = ResourceRequests(
@@ -184,6 +214,7 @@ class ACISpawner(Spawner):
             ports=[ContainerPort(port=self.container_port)],
             command=cmd,
             environment_variables=environment_variables,
+            volume_mounts=self.container_volume_mounts(),
         )
         return container
 
@@ -198,6 +229,7 @@ class ACISpawner(Spawner):
         ports = [
             Port(protocol=ContainerGroupNetworkProtocol.tcp, port=self.container_port)
         ]
+        volumes = self.group_volumes()
         group_ip_address = IpAddress(ports=ports, type="Private")
 
         group = ContainerGroup(
@@ -207,6 +239,7 @@ class ACISpawner(Spawner):
             ip_address=group_ip_address,
             image_registry_credentials=self.acr_credentials,
             subnet_ids=subnet_ids,
+            volumes=volumes,
         )
         return group
 
