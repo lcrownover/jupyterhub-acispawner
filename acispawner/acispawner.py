@@ -182,13 +182,20 @@ class ACISpawner(Spawner):
                 self.resource_group, self.container_group_name
             )
         except Exception as e:
-            self.log.info(f"error getting container: {e}")
+            self.log.debug(f"error getting container: {e}")
             return None
 
-    def create_container_group(self, group):
-        self.aci_client.container_groups.begin_create_or_update(
-            self.resource_group, self.container_group_name, group
-        )
+    async def create_container_group(self, group):
+        for _ in range(3):
+            try:
+                self.aci_client.container_groups.begin_create_or_update(
+                    self.resource_group, self.container_group_name, group
+                )
+                return None
+            except Exception as e:
+                if 'is still transitioning, please retry later' in str(e):
+                    self.log.info(f"container is still transitioning, waiting 10s then trying again")
+                    asyncio.sleep(10)
 
     def delete_container_group(self):
         self.aci_client.container_groups.begin_delete(
@@ -236,8 +243,6 @@ class ACISpawner(Spawner):
 
     async def share_exists(self):
         shares = list(self.storage_client.list_shares())
-        for share in shares:
-            self.log.info(f"share: {share}")
         for share in shares:
             if share.name == self.share_name:
                 return True
@@ -316,7 +321,7 @@ class ACISpawner(Spawner):
     async def spawn_container_group(self, cmd, env):
         container = self.build_container_request(cmd, env)
         group = self.build_container_group_request(container)
-        self.create_container_group(group)
+        await self.create_container_group(group)
         return None
 
     async def start(self):
