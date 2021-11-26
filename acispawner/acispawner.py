@@ -219,7 +219,7 @@ class ACISpawner(Spawner):
                 return True
         return False
 
-    def create_share_if_not_exist(self):
+    async def create_share_if_not_exist(self):
         if not self.share_exists():
             self.log.info(f"creating new share for: {self.user.name}")
             self.create_share()
@@ -320,7 +320,7 @@ class ACISpawner(Spawner):
             return (ip, port)
 
         self.log.info("checking share")
-        # self.create_share_if_not_exist()
+        await self.create_share_if_not_exist()
 
         # Otherwise, it doesn't exist, create it
         await self.spawn_container_group(cmd, env)
