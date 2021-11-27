@@ -97,7 +97,7 @@
       state: started
       enabled: yes
 
-  - name: add class_manager user for admin tasks
+  - name: add class-manager user for admin tasks
     user:
-      name: class_manager
+      name: class-manager
       password: {{ class_manager_password | password_hash('sha512') }}
