@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from azure.mgmt.containerinstance import ContainerInstanceManagementClient
 from azure.mgmt.containerinstance.models import (
@@ -322,6 +321,27 @@ class ACISpawner(Spawner):
         port = net.ports[0].port
         return ip, port
 
+    async def pre_spawn(self):
+        """Returns a tuple of (ip, port) or (False, False)"""
+
+        container_group = self.get_container_group()
+        # TODO implement "remove" option to remove the container if it exists if the user wants
+
+        if container_group:
+            if not container_group.provisioning_state == "Succeeded":
+                # its broken
+                self.delete_container_group()
+                await asyncio.sleep(5) # make sure it's deleted... should probably poll this
+                return (False, False)
+            # api_token = self.get_api_token(container_group)
+            # if api_token:
+            #     self.api_token = api_token
+                # TODO implement start if not running
+                # self.start_container_group(container_group)
+            ip, port = self.get_ip_port(container_group)
+            return (ip, port)
+        return (False, False)
+
     async def spawn_container_group(self, cmd, env):
         container = self.build_container_request(cmd, env)
         group = self.build_container_group_request(container)
@@ -329,9 +349,6 @@ class ACISpawner(Spawner):
         return None
 
     async def start(self):
-        if self.user.name in self.serverless_users:
-            self.log.info(f"{self.user.name} configured as serverless, failing spawn")
-            return None
         env = self.get_env()
         cmd = []
         cmd.extend(self.cmd)
@@ -348,27 +365,19 @@ class ACISpawner(Spawner):
         if self.allow_insecure_writes:
             env["JUPYTER_ALLOW_INSECURE_WRITES"] = "true"
 
-        self.log.info(f"cmd: {cmd}, env: {env}")
+        # self.log.info(f"cmd: {cmd}, env: {env}")
 
-        container_group = self.get_container_group()
-        # TODO implement "remove" option to remove the container if it exists if the user wants
+        if self.user.name in self.serverless_users:
+            # break early, serverless users shouldnt spawn
+            self.log.info(f"{self.user.name} configured as serverless, failing spawn")
+            return None
 
-        if container_group:
-            if not container_group.provisioning_state == "Succeeded":
-                self.delete_container_group()
-                await asyncio.sleep(5) # make sure it's deleted... should probably poll this
-            else:
-                api_token = self.get_api_token(container_group)
-                if api_token:
-                    self.api_token = api_token
-                    # TODO implement start if not running
-                    # self.start_container_group(container_group)
-                    ip, port = self.get_ip_port(container_group)
-                    return (ip, port)
+
+        ip,port = await self.pre_spawn()
+        if ip and port:
+            return (ip, port)
 
         await self.create_share_if_not_exist()
-
-        # Otherwise, it doesn't exist, create it
         await self.spawn_container_group(cmd, env)
 
         # Poll every 10 seconds, calculate timeout based on that.
