@@ -17,6 +17,7 @@
       pkg:
       - python3
       - python3-virtualenv
+      - python3-pycurl
       - nodejs
       - npm
 

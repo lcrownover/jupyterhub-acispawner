@@ -106,11 +106,6 @@ class ACISpawner(Spawner):
         allow_none=True,
         help="how much memory to allocate to each container",
     ).tag(config=True)
-    serverless_users = List(
-        [],
-        allow_none=True,
-        help="list of usernames that should always fail spawning resources. used for the admin account",
-    ).tag(config=True)
     spawn_timeout = Int(
         300,
         allow_none=True,
@@ -257,6 +252,7 @@ class ACISpawner(Spawner):
         if not await self.share_exists():
             self.log.info(f"creating new share for: {self.user.name}")
             await self.create_share()
+            return None
         self.log.info(f"found existing share for: {self.user.name}")
 
     def build_container_request(self, cmd, env):
@@ -366,12 +362,6 @@ class ACISpawner(Spawner):
             env["JUPYTER_ALLOW_INSECURE_WRITES"] = "true"
 
         # self.log.info(f"cmd: {cmd}, env: {env}")
-
-        if self.user.name in self.serverless_users:
-            # break early, serverless users shouldnt spawn
-            self.log.info(f"{self.user.name} configured as serverless, failing spawn")
-            return None
-
 
         ip,port = await self.pre_spawn()
         if ip and port:
