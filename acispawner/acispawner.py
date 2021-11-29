@@ -108,7 +108,7 @@ class ACISpawner(Spawner):
         help="how much memory to allocate to each container",
     ).tag(config=True)
     spawn_timeout = Int(
-        300,
+        600,
         allow_none=True,
         help="timeout until spawn fails. azure spawning is slow, expect several minutes",
     ).tag(config=True)
@@ -154,7 +154,9 @@ class ACISpawner(Spawner):
 
     def create_storage_client(self):
         account_url = f"https://{self.storage_account_name}.file.core.windows.net/"
-        return ShareServiceClient(account_url=account_url, credential=self.storage_account_key)
+        return ShareServiceClient(
+            account_url=account_url, credential=self.storage_account_key
+        )
 
     def set_acr_credentials(self, server, username, password):
         return [
@@ -193,25 +195,37 @@ class ACISpawner(Spawner):
                 )
                 return None
             except Exception as e:
-                if 'is still transitioning, please retry later' in str(e):
-                    self.log.info(f"container is still transitioning, waiting 10s then trying again")
+                if "is still transitioning, please retry later" in str(e):
+                    self.log.info(
+                        f"container is still transitioning, waiting 10s then trying again"
+                    )
                     await asyncio.sleep(10)
 
     def delete_container_group(self):
-        self.aci_client.container_groups.begin_delete(
-            self.resource_group, self.container_group_name
-        )
+        try:
+            self.aci_client.container_groups.begin_delete(
+                self.resource_group, self.container_group_name
+            )
+        except:
+            print(f"container group {self.container_group_name} doesnt exist")
 
     def start_container_group(self):
         self.aci_client.container_groups.begin_start(
             self.resource_group, self.container_group_name
         )
 
+    def stop_container_group(self):
+        self.aci_client.container_groups.stop(
+            self.resource_group, self.container_group_name
+        )
+
     def container_volume_mounts(self):
-        return [VolumeMount(
-            name=self.share_name,
-            mount_path="/home/jovyan/work",
-        )]
+        return [
+            VolumeMount(
+                name=self.share_name,
+                mount_path="/home/jovyan/work",
+            )
+        ]
 
     def group_volumes(self):
         v = Volume(
@@ -220,7 +234,7 @@ class ACISpawner(Spawner):
                 share_name=self.share_name,
                 storage_account_name=self.storage_account_name,
                 storage_account_key=self.storage_account_key,
-            )
+            ),
         )
         return [v]
 
@@ -237,9 +251,9 @@ class ACISpawner(Spawner):
             )
         except Exception as e:
             self.log.info(e)
-            self.log.info(f"tried to create share: {self.share_name} but it already exists")
-
-
+            self.log.info(
+                f"tried to create share: {self.share_name} but it already exists"
+            )
 
     async def share_exists(self):
         shares = list(self.storage_client.list_shares())
@@ -318,37 +332,49 @@ class ACISpawner(Spawner):
         port = net.ports[0].port
         return ip, port
 
-    def test_connect(self):
+    def test_connect(self, container_group):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ip, port = self.get_ip_port(self.get_container_group())
+        ip, port = self.get_ip_port(container_group)
         res = sock.connect_ex((ip, port))
         sock.close()
         if res == 0:
             return True
         return False
 
-    async def pre_spawn(self):
-        """Returns a tuple of (ip, port) or (False, False)"""
+    def is_ready(self, container_group):
+        """Returns True only if all readychecks pass"""
+        if not container_group:
+            return False
+        if not container_group.provisioning_state == "Succeeded":
+            return False
+        if not container_group.instance_view.state == "Running":
+            return False
+        if not self.test_connect(container_group):
+            return False
+        return True
 
-        container_group = self.get_container_group()
-        # TODO implement "remove" option to remove the container if it exists if the user wants
+    async def start_existing(self):
+        """Returns True if an existing container group succeeds a start call"""
+        if not self.get_container_group():
+            return False
+        try:
+            self.start_container_group()
+            return True
+        except Exception as e:
+            self.log.info(e)
+            self.log.info(
+                f"existing container group failed to start: {self.container_group_name}"
+            )
+            return False
 
-        if container_group:
-            if not container_group.provisioning_state == "Succeeded":
-                # its broken
-                self.delete_container_group()
-                await asyncio.sleep(5) # make sure it's deleted... should probably poll this
-                return (False, False)
-            # api_token = self.get_api_token(container_group)
-            # if api_token:
-            #     self.api_token = api_token
-                # TODO implement start if not running
-                # self.start_container_group(container_group)
-            ip, port = self.get_ip_port(container_group)
-            return (ip, port)
-        return (False, False)
+    async def spawn_container_group(self, cmd, env, recreate=False):
+        """
+        Returns None when the container group is created
 
-    async def spawn_container_group(self, cmd, env):
+        Use recreate to delete the existing container group before creating
+        """
+        if recreate:
+            self.delete_container_group()
         container = self.build_container_request(cmd, env)
         group = self.build_container_group_request(container)
         await self.create_container_group(group)
@@ -373,26 +399,26 @@ class ACISpawner(Spawner):
 
         # self.log.info(f"cmd: {cmd}, env: {env}")
 
-        # pre_spawn either returns ip,port (if a server exists already)
-        # or None,None (if we need to create one)
-        ip,port = await self.pre_spawn()
-        if ip and port:
-            return (ip, port)
-
-        await self.create_share_if_not_exist()
-        await self.spawn_container_group(cmd, env)
+        # containers should shut down when not in use, but not delete themselves.
+        # if the container exists, we just want to return the necessary bits
+        # returns None,None if anything is wrong
+        exists = await self.start_existing()
+        if not exists:
+            # otherwise create the share if it doesnt exist
+            await self.create_share_if_not_exist()
+            # then spawn it
+            await self.spawn_container_group(cmd, env, recreate=False)
 
         # Poll every 10 seconds, calculate timeout based on that.
         poll_sleep = 10
         poll_timeout = int(self.spawn_timeout / poll_sleep)
 
         for s in range(poll_timeout):
-            self.log.info(f"polling {self.container_group_name} elapsed: {s*poll_sleep}s")
+            self.log.info(f"polling {self.user.name} elapsed: {s*poll_sleep}s")
             is_up = await self.poll()
-            if is_up is None: # None == it's done
-                self.log.info(f"ready {self.container_group_name} elapsed: {s*poll_sleep}s")
-                container_group = self.get_container_group()
-                ip, port = self.get_ip_port(container_group)
+            if is_up is None:  # None == it's done
+                self.log.info(f"ready {self.user.name} elapsed: {s*poll_sleep}s")
+                ip, port = self.get_ip_port(self.get_container_group())
                 return (ip, port)
             await asyncio.sleep(poll_sleep)
         return None
@@ -403,39 +429,27 @@ class ACISpawner(Spawner):
         Otherwise integer exit status
         """
         container_group = self.get_container_group()
-        state = container_group.provisioning_state
-        if state == "Succeeded":
-            # only test connection if the provisioing state is success
-            # returns True if connection test is success
-            if self.test_connect():
-                return None
-        if state == "Repairing":
-            return 1
+        if self.is_ready(container_group):
+            return None
         return 0
 
     async def stop(self):
         try:
-            container_group = self.get_container_group()
-            self.log.debug(f"deleting container group: {container_group}")
-            self.delete_container_group()
+            self.stop_container_group()
         except Exception as e:
-            self.log.error(f"error deleting container group: {e}")
+            self.log.error(f"error stopping container group: {e}")
         return None
 
+    # we don't need any state, these are unused
     def get_state(self):
         """get the current state"""
         state = super().get_state()
-        # if self.container_group_name:
-        #     state["container_group_name"] = self.container_group_name
         return state
 
     def load_state(self, state):
         """load state from the database"""
         super().load_state(state)
-        if "container_group_name" in state:
-            self.container_group_name = state["container_group_name"]
 
     def clear_state(self):
         """clear any state (called after shutdown)"""
         super().clear_state()
-        # self.container_group_name = ""
