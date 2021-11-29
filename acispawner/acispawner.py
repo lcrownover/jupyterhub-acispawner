@@ -384,11 +384,11 @@ class ACISpawner(Spawner):
             self.start_container_group()
             return True
         except Exception as e:
-            self.log.info(type(e))
-            self.log.info("error:")
-            self.log.info(e.error)
-            self.log.info("reason:")
-            self.log.info(e.reason)
+            if "ContainerGroupTransitioning" in e.error:
+                # TODO: starting containers is just as fast as recreating
+                # rip out the start logic and just create/destroy on start
+                await asyncio.sleep(10)
+                return False
             self.log.info(e)
             self.log.info(
                 f"existing container group failed to start: {self.container_group_name}"
