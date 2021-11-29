@@ -378,17 +378,17 @@ class ACISpawner(Spawner):
 
     async def start_existing(self):
         """Returns True if an existing container group succeeds a start call. Deletes bad container groups"""
-        if not self.get_container_group():
+        if self.get_container_group() is None:
             return False
         try:
             self.start_container_group()
             return True
         except Exception as e:
-            if "ContainerGroupTransitioning" in e.error:
-                # TODO: starting containers is just as fast as recreating
-                # rip out the start logic and just create/destroy on start
-                await asyncio.sleep(10)
-                return False
+            # if "ContainerGroupTransitioning" in e.error:
+            #     # TODO: starting containers is just as fast as recreating
+            #     # rip out the start logic and just create/destroy on start
+            #     await asyncio.sleep(10)
+            #     return False
             self.log.info(e)
             self.log.info(
                 f"existing container group failed to start: {self.container_group_name}"
