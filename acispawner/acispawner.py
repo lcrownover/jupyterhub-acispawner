@@ -378,6 +378,11 @@ class ACISpawner(Spawner):
             self.start_container_group()
             return True
         except Exception as e:
+            self.log.info(type(e))
+            self.log.info("error:")
+            self.log.info(e.error)
+            self.log.info("reason:")
+            self.log.info(e.reason)
             self.log.info(e)
             self.log.info(
                 f"existing container group failed to start: {self.container_group_name}"
