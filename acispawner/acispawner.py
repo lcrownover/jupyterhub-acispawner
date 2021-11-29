@@ -362,6 +362,12 @@ class ACISpawner(Spawner):
             return False
         return True
 
+    def is_broken(self):
+        container_group = self.get_container_group()
+        if container_group is not None and container_group.provisioning_state not in ["Succeeded", "Pending"]:
+            return True
+        return False
+
     def is_stopped(self):
         container_group = self.get_container_group()
         if container_group is None:
@@ -454,6 +460,8 @@ class ACISpawner(Spawner):
         """
         if self.is_ready():
             return None
+        if self.is_broken():
+            return 1
         return 0
 
     async def stop(self, stop_timeout=10):
