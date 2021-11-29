@@ -1,4 +1,5 @@
 import asyncio
+import socket
 
 from azure.mgmt.containerinstance import ContainerInstanceManagementClient
 from azure.mgmt.containerinstance.models import (
@@ -317,6 +318,15 @@ class ACISpawner(Spawner):
         port = net.ports[0].port
         return ip, port
 
+    def test_connect(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        ip, port = self.get_ip_port(self.get_container_group())
+        res = sock.connect_ex((ip, port))
+        sock.close()
+        if res == 0:
+            return True
+        return False
+
     async def pre_spawn(self):
         """Returns a tuple of (ip, port) or (False, False)"""
 
@@ -363,6 +373,8 @@ class ACISpawner(Spawner):
 
         # self.log.info(f"cmd: {cmd}, env: {env}")
 
+        # pre_spawn either returns ip,port (if a server exists already)
+        # or None,None (if we need to create one)
         ip,port = await self.pre_spawn()
         if ip and port:
             return (ip, port)
@@ -393,7 +405,10 @@ class ACISpawner(Spawner):
         container_group = self.get_container_group()
         state = container_group.provisioning_state
         if state == "Succeeded":
-            return None
+            # only test connection if the provisioing state is success
+            # returns True if connection test is success
+            if self.test_connect():
+                return None
         if state == "Repairing":
             return 1
         return 0
