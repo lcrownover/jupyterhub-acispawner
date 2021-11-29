@@ -371,7 +371,7 @@ class ACISpawner(Spawner):
         return False
 
     async def start_existing(self):
-        """Returns True if an existing container group succeeds a start call"""
+        """Returns True if an existing container group succeeds a start call. Deletes bad container groups"""
         if not self.get_container_group():
             return False
         try:
@@ -382,6 +382,7 @@ class ACISpawner(Spawner):
             self.log.info(
                 f"existing container group failed to start: {self.container_group_name}"
             )
+            self.delete_container_group()
             return False
 
     async def spawn_container_group(self, cmd, env, recreate=False):
