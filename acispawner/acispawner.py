@@ -339,9 +339,10 @@ class ACISpawner(Spawner):
             return True
         return False
 
-    def is_ready(self, container_group):
+    def is_ready(self):
         """Returns True only if all readychecks pass"""
-        if not container_group:
+        container_group = self.get_container_group()
+        if container_group is None:
             return False
         if not container_group.provisioning_state == "Succeeded":
             return False
@@ -350,6 +351,14 @@ class ACISpawner(Spawner):
         if not self.test_connect(container_group):
             return False
         return True
+
+    def is_stopped(self):
+        container_group = self.get_container_group()
+        if container_group is None:
+            return True
+        if container_group.instance_view.state == "Stopped":
+            return True
+        return False
 
     async def start_existing(self):
         """Returns True if an existing container group succeeds a start call"""
@@ -427,14 +436,19 @@ class ACISpawner(Spawner):
         Return None if running
         Otherwise integer exit status
         """
-        container_group = self.get_container_group()
-        if self.is_ready(container_group):
+        if self.is_ready():
             return None
         return 0
 
-    async def stop(self):
+    async def stop(self, stop_timeout=10):
         try:
             self.stop_container_group()
+            for _ in range(stop_timeout):
+                if self.is_stopped():
+                    return None
+                await asyncio.sleep(1)
+            # its not shutting down
+            return 1
         except Exception as e:
             self.log.error(f"error stopping container group: {e}")
         return None
