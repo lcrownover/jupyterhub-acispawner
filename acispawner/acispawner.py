@@ -62,10 +62,15 @@ class ACISpawner(Spawner):
         allow_none=True,
         help="storage access tier for each user share",
     ).tag(config=True)
-    container_image = Unicode(
+    container_image_name = Unicode(
         None,
         allow_none=False,
-        help="url of container image",
+        help="full url for container image name",
+    ).tag(config=True)
+    container_image_tag = Unicode(
+        None,
+        allow_none=True,
+        help="tag for the container image",
     ).tag(config=True)
     subscription_id = Unicode(
         None,
@@ -268,6 +273,11 @@ class ACISpawner(Spawner):
             await self.create_share()
             return None
 
+    def build_container_image_name(self):
+        if self.container_image_tag is None:
+            return self.container_image_name
+        return f"{self.container_image_name}:{self.container_image_tag}"
+
     def build_container_request(self, cmd, env):
         container_resource_requests = ResourceRequests(
             memory_in_gb=self.container_mem_limit,
@@ -281,7 +291,7 @@ class ACISpawner(Spawner):
         ]
         container = Container(
             name=self.container_name,
-            image=self.container_image,
+            image=self.build_container_image_name(),
             resources=container_resource_requirements,
             ports=[ContainerPort(port=self.container_port)],
             command=cmd,
